@@ -1,54 +1,70 @@
 /**
  * exportar-activos.js
- * Busca todas las temporadas activas en Supabase y exporta cada una a Google Sheets.
- * Este es el script que corre automáticamente en GitHub Actions.
+ * Exporta todas las temporadas activas a Google Sheets.
+ * Crea UN spreadsheet por mes/año con UNA PESTAÑA POR CLASE.
  *
  * Uso: node exportar-activos.js
  */
 
 require('dotenv').config()
 const { createClient } = require('@supabase/supabase-js')
-const { execSync } = require('child_process')
-
-const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
-               'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
+const { google } = require('googleapis')
+const { exportarClase, getAuth, buscarOCrearSpreadsheet, compartirSheet, MESES } = require('./exportar')
 
 async function main() {
   const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY)
 
-  const { data: seasons, error } = await supabase
-    .from('seasons')
-    .select('*')
-    .eq('active', true)
+  const { data: seasons, error } = await supabase.from('seasons').select('*').eq('active', true)
 
   if (error || !seasons || seasons.length === 0) {
-    console.log('ℹ️  No hay temporadas activas en este momento.')
+    console.log('ℹ️  No hay temporadas activas.')
     return
   }
 
-  console.log(`\n🔄 Exportando ${seasons.length} temporada(s) activa(s)...\n`)
+  console.log(`\n🔄 ${seasons.length} temporada(s) activa(s)\n`)
 
-  let exitosos = 0
-  let fallidos = 0
+  // Agrupar por mes + año → un spreadsheet por grupo
+  const grupos = {}
+  for (const s of seasons) {
+    const key = `${s.year}-${String(s.month).padStart(2,'0')}`
+    if (!grupos[key]) grupos[key] = { month: s.month, year: s.year, seasons: [] }
+    grupos[key].seasons.push(s)
+  }
 
-  for (const season of seasons) {
-    const mes = season.month + 1 // Supabase guarda 0-11, el script espera 1-12
-    console.log(`── ${season.class_id} | ${MESES[season.month]} ${season.year}`)
-    try {
-      execSync(`node exportar.js ${season.class_id} ${mes} ${season.year}`, {
-        stdio: 'inherit',
-        cwd: __dirname,
-      })
-      exitosos++
-    } catch {
-      console.error(`   ❌ Falló la exportación de ${season.class_id}`)
-      fallidos++
+  const auth   = getAuth()
+  const drive  = google.drive({ version: 'v3', auth })
+  const sheets = google.sheets({ version: 'v4', auth })
+
+  let exitosos = 0, fallidos = 0
+
+  for (const { month, year, seasons: grupo } of Object.values(grupos)) {
+    const titulo = `Asistencia - ${MESES[month]} ${year}`
+    console.log(`📊 ${titulo}`)
+
+    const spreadsheetId = await buscarOCrearSpreadsheet(drive, sheets, titulo)
+
+    for (const season of grupo) {
+      try {
+        const { CLASS_MAP } = require('./exportar')
+        const info    = CLASS_MAP[season.class_id]
+        const tabName = `${info.nombre} - ${info.dia}`
+
+        await exportarClase(season.class_id, season.month, season.year, {
+          auth, spreadsheetId, tabName,
+        })
+        exitosos++
+      } catch (err) {
+        console.error(`  ❌ Error en ${season.class_id}: ${err.message}`)
+        fallidos++
+      }
     }
-    console.log()
+
+    await compartirSheet(auth, spreadsheetId)
+    console.log(`  🔗 https://docs.google.com/spreadsheets/d/${spreadsheetId}\n`)
   }
 
   console.log('─'.repeat(50))
-  console.log(`✅ Exportados: ${exitosos} | ❌ Fallidos: ${fallidos}\n`)
+  console.log(`✅ Exitosos: ${exitosos} | ❌ Fallidos: ${fallidos}\n`)
 }
 
 main().catch(err => {
