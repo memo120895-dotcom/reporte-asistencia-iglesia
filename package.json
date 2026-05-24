@@ -1,0 +1,12 @@
+{
+  "name": "reporte-asistencia",
+  "version": "1.0.0",
+  "description": "Exporta asistencia de Supabase a Google Sheets",
+  "main": "exportar.js",
+  "type": "commonjs",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0",
+    "dotenv": "^16.3.1",
+    "googleapis": "^140.0.0"
+  }
+}
