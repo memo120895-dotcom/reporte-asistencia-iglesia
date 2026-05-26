@@ -2,9 +2,8 @@ name: Exportar Asistencia a Google Sheets
 
 on:
   schedule:
-    # Corre todos los días a las 6am UTC = 12am hora México (medianoche)
-    # Así el sheet siempre está actualizado al inicio del día siguiente
-    - cron: '0 6 * * *'
+    - cron: '0 2 * * 4'   # Miércoles 9pm hora México (CDT, UTC-5)
+    - cron: '0 19 * * 0'  # Domingo 2pm hora México (CDT, UTC-5)
   workflow_dispatch:
     # También se puede correr manualmente desde GitHub haciendo clic en "Run workflow"
 
