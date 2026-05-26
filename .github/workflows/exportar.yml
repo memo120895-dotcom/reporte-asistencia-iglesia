@@ -34,3 +34,4 @@ jobs:
           SHARE_EMAIL: ${{ secrets.SHARE_EMAIL }}
           GOOGLE_CREDENTIALS_JSON: ${{ secrets.GOOGLE_CREDENTIALS_JSON }}
           GOOGLE_TOKEN_JSON: ${{ secrets.GOOGLE_TOKEN_JSON }}
+          GOOGLE_TOKEN_JSON2: ${{ secrets.GOOGLE_TOKEN_JSON2 }}

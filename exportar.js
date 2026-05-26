@@ -37,33 +37,44 @@ const COLOR_HEADER_BG  = { red: 0.95, green: 0.95, blue: 0.95 }
 
 // ─── Autenticación Google ─────────────────────────────────────────────────────
 
-function getAuth() {
+// suffix: '' = cuenta principal (token.json), '2' = segunda cuenta (token2.json)
+function getAuth(suffix = '') {
+  const tokenPath = path.join(__dirname, `token${suffix}.json`)
+  const credEnvKey  = suffix ? `GOOGLE_CREDENTIALS_JSON${suffix}` : 'GOOGLE_CREDENTIALS_JSON'
+  const tokenEnvKey = suffix ? `GOOGLE_TOKEN_JSON${suffix}`       : 'GOOGLE_TOKEN_JSON'
+
   let credentials, token
 
-  if (process.env.GOOGLE_CREDENTIALS_JSON) {
-    credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS_JSON)
-    token       = JSON.parse(process.env.GOOGLE_TOKEN_JSON)
+  // Para la segunda cuenta en CI, reutiliza GOOGLE_CREDENTIALS_JSON si no hay uno específico
+  const hasEnvCreds  = !!(process.env[credEnvKey]  || process.env.GOOGLE_CREDENTIALS_JSON)
+  const hasEnvToken  = !!(process.env[tokenEnvKey])
+  if (hasEnvCreds && (hasEnvToken || suffix === '')) {
+    const credJson  = process.env[credEnvKey]  || process.env.GOOGLE_CREDENTIALS_JSON
+    const tokenJson = process.env[tokenEnvKey] || process.env.GOOGLE_TOKEN_JSON
+    credentials = JSON.parse(credJson)
+    token       = JSON.parse(tokenJson)
   } else {
     if (!fs.existsSync(CREDENTIALS_PATH)) {
       console.error('❌ No se encontró credentials.json. Revisa el README.txt.')
       process.exit(1)
     }
-    if (!fs.existsSync(TOKEN_PATH)) {
+    if (!fs.existsSync(tokenPath)) {
+      if (suffix) return null  // segunda cuenta opcional
       console.error('❌ No se encontró token.json. Ejecuta primero: node setup-auth.js')
       process.exit(1)
     }
     credentials = JSON.parse(fs.readFileSync(CREDENTIALS_PATH))
-    token       = JSON.parse(fs.readFileSync(TOKEN_PATH))
+    token       = JSON.parse(fs.readFileSync(tokenPath))
   }
 
   const { client_secret, client_id, redirect_uris } = credentials.installed
   const auth = new google.auth.OAuth2(client_id, client_secret, redirect_uris[0])
   auth.setCredentials(token)
 
-  if (!process.env.GOOGLE_CREDENTIALS_JSON) {
+  if (!process.env[credEnvKey]) {
     auth.on('tokens', (tokens) => {
-      const current = JSON.parse(fs.readFileSync(TOKEN_PATH))
-      fs.writeFileSync(TOKEN_PATH, JSON.stringify({ ...current, ...tokens }, null, 2))
+      const current = JSON.parse(fs.readFileSync(tokenPath))
+      fs.writeFileSync(tokenPath, JSON.stringify({ ...current, ...tokens }, null, 2))
     })
   }
 

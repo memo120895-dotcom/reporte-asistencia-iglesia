@@ -1,7 +1,10 @@
 /**
  * setup-auth.js
- * Ejecutar UNA SOLA VEZ para conectar con la cuenta sanidadmasvida@gmail.com
- * Uso: node setup-auth.js
+ * Conectar una cuenta de Google con la API.
+ *
+ * Uso:
+ *   node setup-auth.js           → genera token.json  (cuenta principal)
+ *   node setup-auth.js --cuenta=2 → genera token2.json (segunda cuenta)
  */
 
 const fs = require('fs')
@@ -10,13 +13,17 @@ const { google } = require('googleapis')
 const readline = require('readline')
 
 const CREDENTIALS_PATH = path.join(__dirname, 'credentials.json')
-const TOKEN_PATH = path.join(__dirname, 'token.json')
 const SCOPES = [
   'https://www.googleapis.com/auth/spreadsheets',
   'https://www.googleapis.com/auth/drive',
 ]
 
 async function main() {
+  const arg    = process.argv.find(a => a.startsWith('--cuenta='))
+  const suffix = arg ? arg.split('=')[1] : ''
+  const tokenFile = `token${suffix}.json`
+  const TOKEN_PATH = path.join(__dirname, tokenFile)
+
   if (!fs.existsSync(CREDENTIALS_PATH)) {
     console.log('\n❌ No se encontró el archivo credentials.json')
     console.log('\nPara obtenerlo:')
@@ -29,6 +36,9 @@ async function main() {
     process.exit(1)
   }
 
+  const etiq = suffix ? ` (cuenta ${suffix})` : ' (cuenta principal)'
+  console.log(`\n🔑 Configurando autenticación${etiq} → se guardará en ${tokenFile}`)
+
   const credentials = JSON.parse(fs.readFileSync(CREDENTIALS_PATH))
   const { client_secret, client_id, redirect_uris } = credentials.installed
   const oAuth2Client = new google.auth.OAuth2(client_id, client_secret, redirect_uris[0])
@@ -39,7 +49,7 @@ async function main() {
     prompt: 'consent',
   })
 
-  console.log('\n✅ Abre este link en tu navegador e inicia sesión con sanidadmasvida@gmail.com:')
+  console.log('\nAbre este link en tu navegador e inicia sesión con la cuenta de Google que deseas conectar:')
   console.log('\n' + authUrl + '\n')
 
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout })
@@ -48,8 +58,12 @@ async function main() {
     try {
       const { tokens } = await oAuth2Client.getToken(code.trim())
       fs.writeFileSync(TOKEN_PATH, JSON.stringify(tokens, null, 2))
-      console.log('\n✅ ¡Listo! Autenticación guardada en token.json')
-      console.log('Ya puedes usar: node exportar.js\n')
+      console.log(`\n✅ ¡Listo! Autenticación guardada en ${tokenFile}`)
+      if (suffix) {
+        console.log('La segunda cuenta ya está lista. node exportar-activos.js exportará a ambas cuentas.\n')
+      } else {
+        console.log('Ya puedes usar: node exportar.js\n')
+      }
     } catch (err) {
       console.error('\n❌ Error al obtener el token:', err.message)
     }
