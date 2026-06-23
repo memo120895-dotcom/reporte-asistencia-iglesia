@@ -199,7 +199,13 @@ async function escribirTab(sheets, spreadsheetId, sheetId, tabName, filas, fecha
   const encabezados = [
     'Clase', 'Lider de grupo', 'Nombre', 'Numero', 'Salon',
     'Dia de sesion', 'Registro en plataforma',
-    ...fechas.map((_, i) => `Sesion ${i + 1}`),
+    ...fechas.map((f) => {
+      const [y, m, d] = f.split('-').map(Number)
+      const dt = new Date(y, m - 1, d)
+      const dias = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb']
+      const meses = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
+      return `${dias[dt.getDay()]} ${d} ${meses[m - 1]}`
+    }),
   ]
 
   const valores = [
