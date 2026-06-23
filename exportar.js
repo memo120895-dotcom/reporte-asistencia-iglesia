@@ -44,6 +44,7 @@ function getAuth(suffix = '') {
   const tokenEnvKey = suffix ? `GOOGLE_TOKEN_JSON${suffix}`       : 'GOOGLE_TOKEN_JSON'
 
   let credentials, token
+  let usingFiles = false
 
   // Para la segunda cuenta en CI, reutiliza GOOGLE_CREDENTIALS_JSON si no hay uno específico
   const hasEnvCreds  = !!(process.env[credEnvKey]  || process.env.GOOGLE_CREDENTIALS_JSON)
@@ -54,6 +55,7 @@ function getAuth(suffix = '') {
     credentials = JSON.parse(credJson)
     token       = JSON.parse(tokenJson)
   } else {
+    usingFiles = true
     if (!fs.existsSync(CREDENTIALS_PATH)) {
       console.error('❌ No se encontró credentials.json. Revisa el README.txt.')
       process.exit(1)
@@ -71,7 +73,7 @@ function getAuth(suffix = '') {
   const auth = new google.auth.OAuth2(client_id, client_secret, redirect_uris[0])
   auth.setCredentials(token)
 
-  if (!process.env[credEnvKey]) {
+  if (usingFiles) {
     auth.on('tokens', (tokens) => {
       const current = JSON.parse(fs.readFileSync(tokenPath))
       fs.writeFileSync(tokenPath, JSON.stringify({ ...current, ...tokens }, null, 2))
