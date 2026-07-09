@@ -73,12 +73,13 @@ function getAuth(suffix = '') {
   const auth = new google.auth.OAuth2(client_id, client_secret, redirect_uris[0])
   auth.setCredentials(token)
 
-  if (usingFiles) {
-    auth.on('tokens', (tokens) => {
-      const current = JSON.parse(fs.readFileSync(tokenPath))
-      fs.writeFileSync(tokenPath, JSON.stringify({ ...current, ...tokens }, null, 2))
-    })
-  }
+  // Siempre persiste el token renovado a tokenPath, también cuando se arrancó
+  // desde variables de entorno (CI): así el workflow puede leerlo después y
+  // resincronizarlo al secret de GitHub si Google emitió uno distinto.
+  auth.on('tokens', (tokens) => {
+    token = { ...token, ...tokens }
+    fs.writeFileSync(tokenPath, JSON.stringify(token, null, 2))
+  })
 
   return auth
 }

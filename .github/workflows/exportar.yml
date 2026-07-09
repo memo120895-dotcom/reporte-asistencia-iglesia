@@ -33,3 +33,17 @@ jobs:
           SHARE_EMAIL: ${{ secrets.SHARE_EMAIL }}
           GOOGLE_CREDENTIALS_JSON: ${{ secrets.GOOGLE_CREDENTIALS_JSON }}
           GOOGLE_TOKEN_JSON: ${{ secrets.GOOGLE_TOKEN_JSON }}
+
+      # Si Google emitió un token distinto al de arranque, lo resincroniza al
+      # secret para que la próxima corrida ya no dependa de una copia congelada.
+      - name: Actualizar GOOGLE_TOKEN_JSON si cambió
+        if: always()
+        run: |
+          if [ -f token.json ]; then
+            gh secret set GOOGLE_TOKEN_JSON < token.json
+            echo "Token resincronizado."
+          else
+            echo "No se generó token.json, nada que resincronizar."
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
