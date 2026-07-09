@@ -299,18 +299,19 @@ async function escribirTab(sheets, spreadsheetId, sheetId, tabName, filas, fecha
 }
 
 async function compartirSheet(auth, spreadsheetId) {
-  const drive      = google.drive({ version: 'v3', auth })
-  const shareEmail = process.env.SHARE_EMAIL
-  if (!shareEmail) return
-  try {
-    await drive.permissions.create({
-      fileId: spreadsheetId,
-      requestBody: { type: 'user', role: 'writer', emailAddress: shareEmail },
-      sendNotificationEmail: false,
-    })
-    console.log(`  ✅ Compartido con ${shareEmail}`)
-  } catch (err) {
-    if (!err.message?.includes('already')) console.warn(`  ⚠️  No se pudo compartir: ${err.message}`)
+  const drive   = google.drive({ version: 'v3', auth })
+  const emails  = (process.env.SHARE_EMAIL || '').split(',').map(e => e.trim()).filter(Boolean)
+  for (const shareEmail of emails) {
+    try {
+      await drive.permissions.create({
+        fileId: spreadsheetId,
+        requestBody: { type: 'user', role: 'writer', emailAddress: shareEmail },
+        sendNotificationEmail: false,
+      })
+      console.log(`  ✅ Compartido con ${shareEmail}`)
+    } catch (err) {
+      if (!err.message?.includes('already')) console.warn(`  ⚠️  No se pudo compartir con ${shareEmail}: ${err.message}`)
+    }
   }
 }
 

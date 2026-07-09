@@ -3,6 +3,11 @@
  * Exporta todas las temporadas activas a Google Sheets.
  * Crea UN spreadsheet por mes/año con UNA PESTAÑA POR CLASE.
  *
+ * Una sola cuenta (token.json) es dueña y escribe el spreadsheet; las demás
+ * personas reciben acceso por SHARE_EMAIL (lista separada por comas) en vez
+ * de tener cada una su propia copia — evita spreadsheets duplicados con
+ * formato divergente cuando el nombre coincide entre cuentas.
+ *
  * Uso: node exportar-activos.js
  */
 
@@ -31,43 +36,37 @@ async function main() {
     grupos[key].seasons.push(s)
   }
 
-  const cuentas = [getAuth(), getAuth('2')].filter(Boolean)
-  console.log(`🔑 Cuentas de Google configuradas: ${cuentas.length}\n`)
+  const auth   = getAuth()
+  const drive  = google.drive({ version: 'v3', auth })
+  const sheets = google.sheets({ version: 'v4', auth })
 
   let exitosos = 0, fallidos = 0
 
   for (const { month, year, seasons: grupo } of Object.values(grupos)) {
     const titulo = `Asistencia - ${MESES[month]} ${year}`
 
-    for (let i = 0; i < cuentas.length; i++) {
-      const auth    = cuentas[i]
-      const etiq    = cuentas.length > 1 ? ` [Cuenta ${i + 1}]` : ''
-      const drive   = google.drive({ version: 'v3', auth })
-      const sheets  = google.sheets({ version: 'v4', auth })
+    console.log(`📊 ${titulo}`)
 
-      console.log(`📊 ${titulo}${etiq}`)
+    const spreadsheetId = await buscarOCrearSpreadsheet(drive, sheets, titulo)
 
-      const spreadsheetId = await buscarOCrearSpreadsheet(drive, sheets, titulo)
+    for (const season of grupo) {
+      try {
+        const { CLASS_MAP } = require('./exportar')
+        const info    = CLASS_MAP[season.class_id]
+        const tabName = `${info.nombre} - ${info.dia}`
 
-      for (const season of grupo) {
-        try {
-          const { CLASS_MAP } = require('./exportar')
-          const info    = CLASS_MAP[season.class_id]
-          const tabName = `${info.nombre} - ${info.dia}`
-
-          await exportarClase(season.class_id, season.month, season.year, {
-            auth, spreadsheetId, tabName,
-          })
-          exitosos++
-        } catch (err) {
-          console.error(`  ❌ Error en ${season.class_id}: ${err.message}`)
-          fallidos++
-        }
+        await exportarClase(season.class_id, season.month, season.year, {
+          auth, spreadsheetId, tabName,
+        })
+        exitosos++
+      } catch (err) {
+        console.error(`  ❌ Error en ${season.class_id}: ${err.message}`)
+        fallidos++
       }
-
-      await compartirSheet(auth, spreadsheetId)
-      console.log(`  🔗 https://docs.google.com/spreadsheets/d/${spreadsheetId}\n`)
     }
+
+    await compartirSheet(auth, spreadsheetId)
+    console.log(`  🔗 https://docs.google.com/spreadsheets/d/${spreadsheetId}\n`)
   }
 
   console.log('─'.repeat(50))
